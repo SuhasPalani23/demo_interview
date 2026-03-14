@@ -5,16 +5,13 @@
     "version": "2.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "scheme": "interview-assistant",
     "plugins": [
       "expo-router",
-      [
-        "expo-av",
-        {
-          "microphonePermission": "Allow Interview Assistant to record your interview questions."
-        }
-      ]
+      ["expo-audio", { "microphonePermission": "Allow Interview Assistant to record your interview questions." }]
     ],
     "ios": {
       "supportsTablet": false,
@@ -25,7 +22,9 @@
     },
     "android": {
       "package": "com.interviewassistant.app",
-      "permissions": ["RECORD_AUDIO"]
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
     }
   }
 }

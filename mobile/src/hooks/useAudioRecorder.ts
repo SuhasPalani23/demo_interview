@@ -1,10 +1,11 @@
 /**
  * useAudioRecorder.ts
  * Tap to start recording → tap to stop → sends audio to /transcribe → returns text
+ * Uses expo-audio (replaces deprecated expo-av)
  */
 
 import { useState, useRef, useCallback } from "react";
-import { Audio } from "expo-av";
+import { useAudioRecorder as useExpoAudioRecorder, AudioModule, RecordingPresets } from "expo-audio";
 import { API_BASE } from "../config";
 
 export type RecordingState = "idle" | "requesting" | "recording" | "processing" | "error";
@@ -20,54 +21,44 @@ export interface AudioRecorderResult {
 export function useAudioRecorder(): AudioRecorderResult {
   const [state, setState] = useState<RecordingState>("idle");
   const [error, setError] = useState<string | null>(null);
-  const recordingRef = useRef<Audio.Recording | null>(null);
+  const recorder = useExpoAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const isRecordingRef = useRef(false);
 
   const startRecording = useCallback(async () => {
     setError(null);
     setState("requesting");
 
     try {
-      // Request microphone permission
-      const { granted } = await Audio.requestPermissionsAsync();
-      if (!granted) {
+      const status = await AudioModule.requestRecordingPermissionsAsync();
+      if (!status.granted) {
         setError("Microphone permission denied");
         setState("error");
         return;
       }
 
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-
-      // Use high-quality preset for better transcription
-      const { recording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
-      );
-
-      recordingRef.current = recording;
+      await recorder.prepareToRecordAsync();
+      recorder.record();
+      isRecordingRef.current = true;
       setState("recording");
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Failed to start recording";
       setError(msg);
       setState("error");
     }
-  }, []);
+  }, [recorder]);
 
   const stopAndTranscribe = useCallback(async (): Promise<string | null> => {
-    if (!recordingRef.current) {
+    if (!isRecordingRef.current) {
       setState("idle");
       return null;
     }
 
     setState("processing");
+    isRecordingRef.current = false;
 
     try {
-      await recordingRef.current.stopAndUnloadAsync();
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
-
-      const uri = recordingRef.current.getURI();
-      recordingRef.current = null;
+      await recorder.stop();
+      const uri = recorder.uri;
 
       if (!uri) {
         throw new Error("No audio URI after recording");
@@ -95,7 +86,7 @@ export function useAudioRecorder(): AudioRecorderResult {
       }
 
       const data = await response.json();
-      const transcription = (data.transcription || "").trim();
+      const transcription = (data.transcription || "");
 
       setState("idle");
       return transcription || null;
@@ -103,24 +94,22 @@ export function useAudioRecorder(): AudioRecorderResult {
       const msg = err instanceof Error ? err.message : "Transcription failed";
       setError(msg);
       setState("error");
-      recordingRef.current = null;
       return null;
     }
-  }, []);
+  }, [recorder]);
 
   const cancelRecording = useCallback(async () => {
-    if (recordingRef.current) {
+    if (isRecordingRef.current) {
       try {
-        await recordingRef.current.stopAndUnloadAsync();
+        await recorder.stop();
       } catch {
         // ignore
       }
-      recordingRef.current = null;
+      isRecordingRef.current = false;
     }
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
     setState("idle");
     setError(null);
-  }, []);
+  }, [recorder]);
 
   return { state, error, startRecording, stopAndTranscribe, cancelRecording };
 }

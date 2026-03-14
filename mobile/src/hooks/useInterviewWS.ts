@@ -6,7 +6,7 @@ export type ConnectionStatus = "idle" | "connecting" | "searching" | "connected"
 export interface InterviewPayload {
   jobDescription: string;
   question: string;
-  resume?: string; // optional fallback if no index
+  resume?: string;
 }
 
 export interface ContextInfo {
@@ -70,9 +70,11 @@ export function useInterviewWS() {
             setStatus("searching");
           } else if (msg.type === "context") {
             setContextInfo({ sources: msg.sources, chunks: msg.chunks });
-            setIsStreaming(true);
+            // Don't gate streaming on context — tokens may already be arriving
           } else if (msg.type === "token") {
+            // Start streaming immediately on first token
             setIsStreaming(true);
+            setStatus("connected");
             setAnswer((prev) => prev + msg.content);
           } else if (msg.type === "done") {
             setIsStreaming(false);

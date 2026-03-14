@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -29,14 +29,19 @@ export function QuestionInput({
   const [isFocused, setIsFocused] = useState(false);
   const { state: micState, error: micError, startRecording, stopAndTranscribe, cancelRecording } = useAudioRecorder();
 
+  // We need a ref to hold the latest jobDescriptionFilled + isStreaming
+  // so the async transcription callback sees current values
+  const canAutoSubmitRef = useRef(false);
+  canAutoSubmitRef.current = jobDescriptionFilled && !isStreaming;
+
   const handleStopAndTranscribe = async () => {
     const text = await stopAndTranscribe();
-    if (text) {
+    if (text && text.trim().length > 0) {
       onChange(text);
-      // Auto-submit after transcription — jobDescription is already filled if canSubmit was close
-      // We check it directly: if JD exists + we just got a question, fire immediately
-      if (jobDescriptionFilled && !isStreaming) {
-        setTimeout(() => onSubmit(), 80);
+      // Auto-fire ask as soon as we have a question + JD is filled
+      if (canAutoSubmitRef.current) {
+        // Small tick to let React flush the onChange state update
+        setTimeout(() => onSubmit(), 50);
       }
     }
   };
