@@ -2,18 +2,30 @@
   "expo": {
     "name": "Interview Assistant",
     "slug": "interview-assistant",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "assetBundlePatterns": ["**/*"],
     "scheme": "interview-assistant",
-    "plugins": ["expo-router"],
+    "plugins": [
+      "expo-router",
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow Interview Assistant to record your interview questions."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.interviewassistant.app"
+      "bundleIdentifier": "com.interviewassistant.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Allow Interview Assistant to record your interview questions."
+      }
     },
     "android": {
-      "package": "com.interviewassistant.app"
+      "package": "com.interviewassistant.app",
+      "permissions": ["RECORD_AUDIO"]
     }
   }
 }

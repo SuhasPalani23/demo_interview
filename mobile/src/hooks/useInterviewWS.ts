@@ -1,12 +1,17 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { WS_URL } from "../config";
 
-export type ConnectionStatus = "idle" | "connecting" | "connected" | "error" | "disconnected";
+export type ConnectionStatus = "idle" | "connecting" | "searching" | "connected" | "error" | "disconnected";
 
 export interface InterviewPayload {
-  resume: string;
   jobDescription: string;
   question: string;
+  resume?: string; // optional fallback if no index
+}
+
+export interface ContextInfo {
+  sources: string[];
+  chunks: number;
 }
 
 export function useInterviewWS() {
@@ -14,6 +19,7 @@ export function useInterviewWS() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [status, setStatus] = useState<ConnectionStatus>("idle");
   const [error, setError] = useState<string | null>(null);
+  const [contextInfo, setContextInfo] = useState<ContextInfo | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const pendingPayloadRef = useRef<InterviewPayload | null>(null);
 
@@ -33,9 +39,7 @@ export function useInterviewWS() {
     }
   }, []);
 
-  useEffect(() => {
-    return () => cleanup();
-  }, [cleanup]);
+  useEffect(() => () => cleanup(), [cleanup]);
 
   const ask = useCallback(
     (payload: InterviewPayload) => {
@@ -43,6 +47,7 @@ export function useInterviewWS() {
       setAnswer("");
       setError(null);
       setIsStreaming(false);
+      setContextInfo(null);
       setStatus("connecting");
       pendingPayloadRef.current = payload;
 
@@ -51,7 +56,6 @@ export function useInterviewWS() {
 
       ws.onopen = () => {
         setStatus("connected");
-        setIsStreaming(true);
         if (pendingPayloadRef.current) {
           ws.send(JSON.stringify(pendingPayloadRef.current));
           pendingPayloadRef.current = null;
@@ -61,7 +65,14 @@ export function useInterviewWS() {
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === "token") {
+
+          if (msg.type === "searching") {
+            setStatus("searching");
+          } else if (msg.type === "context") {
+            setContextInfo({ sources: msg.sources, chunks: msg.chunks });
+            setIsStreaming(true);
+          } else if (msg.type === "token") {
+            setIsStreaming(true);
             setAnswer((prev) => prev + msg.content);
           } else if (msg.type === "done") {
             setIsStreaming(false);
@@ -74,7 +85,7 @@ export function useInterviewWS() {
             cleanup();
           }
         } catch {
-          // ignore parse errors for partial messages
+          // ignore parse errors
         }
       };
 
@@ -89,7 +100,7 @@ export function useInterviewWS() {
         wsRef.current = null;
       };
     },
-    [cleanup, status]
+    [cleanup]
   );
 
   const reset = useCallback(() => {
@@ -98,7 +109,8 @@ export function useInterviewWS() {
     setError(null);
     setIsStreaming(false);
     setStatus("idle");
+    setContextInfo(null);
   }, [cleanup]);
 
-  return { answer, isStreaming, status, error, ask, reset };
+  return { answer, isStreaming, status, error, contextInfo, ask, reset };
 }

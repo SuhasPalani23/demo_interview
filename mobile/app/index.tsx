@@ -12,30 +12,26 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import * as Haptics from "expo-haptics";
 
-import { ResumeInput } from "../src/components/ResumeInput";
 import { JobDescriptionInput } from "../src/components/JobDescriptionInput";
 import { QuestionInput } from "../src/components/QuestionInput";
 import { StreamingAnswer } from "../src/components/StreamingAnswer";
 import { useInterviewWS } from "../src/hooks/useInterviewWS";
 
 export default function InterviewScreen() {
-  const [resume, setResume] = useState("");
   const [jobDescription, setJobDescription] = useState("");
   const [question, setQuestion] = useState("");
 
-  const { answer, isStreaming, status, error, ask, reset } = useInterviewWS();
+  const { answer, isStreaming, status, error, contextInfo, ask, reset } = useInterviewWS();
 
   const canSubmit =
-    resume.trim().length > 0 &&
     jobDescription.trim().length > 0 &&
     question.trim().length > 0;
 
   const handleAsk = useCallback(async () => {
     if (!canSubmit || isStreaming) return;
-
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    ask({ resume, jobDescription, question });
-  }, [canSubmit, isStreaming, ask, resume, jobDescription, question]);
+    ask({ jobDescription, question });
+  }, [canSubmit, isStreaming, ask, jobDescription, question]);
 
   const handleReset = useCallback(async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -50,11 +46,8 @@ export default function InterviewScreen() {
         text: "Clear",
         style: "destructive",
         onPress: async () => {
-          await Haptics.notificationAsync(
-            Haptics.NotificationFeedbackType.Warning
-          );
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
           reset();
-          setResume("");
           setJobDescription("");
           setQuestion("");
         },
@@ -62,15 +55,10 @@ export default function InterviewScreen() {
     ]);
   }, [reset]);
 
-  const setupComplete =
-    resume.trim().length > 0 && jobDescription.trim().length > 0;
+  const setupComplete = jobDescription.trim().length > 0;
 
   return (
-    <SafeAreaView
-      className="flex-1"
-      style={{ backgroundColor: "#0a0a0a" }}
-      edges={["top"]}
-    >
+    <SafeAreaView className="flex-1" style={{ backgroundColor: "#0a0a0a" }} edges={["top"]}>
       <StatusBar style="light" />
 
       <KeyboardAvoidingView
@@ -108,6 +96,8 @@ export default function InterviewScreen() {
                   className={`flex-row items-center gap-1.5 px-3 py-1.5 rounded-full border ${
                     isStreaming
                       ? "border-streaming-dim bg-streaming/10"
+                      : status === "searching"
+                      ? "border-accent-dim bg-surface-elevated"
                       : setupComplete
                       ? "border-border bg-surface-elevated"
                       : "border-border bg-surface-elevated"
@@ -117,6 +107,8 @@ export default function InterviewScreen() {
                     className={`w-1.5 h-1.5 rounded-full ${
                       isStreaming
                         ? "bg-streaming"
+                        : status === "searching"
+                        ? "bg-accent-dim"
                         : setupComplete
                         ? "bg-accent-dim"
                         : "bg-text-muted"
@@ -127,6 +119,8 @@ export default function InterviewScreen() {
                     className={`text-xs ${
                       isStreaming
                         ? "text-streaming"
+                        : status === "searching"
+                        ? "text-accent-dim"
                         : setupComplete
                         ? "text-accent-dim"
                         : "text-text-muted"
@@ -134,6 +128,8 @@ export default function InterviewScreen() {
                   >
                     {isStreaming
                       ? "answering"
+                      : status === "searching"
+                      ? "searching"
                       : setupComplete
                       ? "ready"
                       : "setup"}
@@ -141,25 +137,16 @@ export default function InterviewScreen() {
                 </View>
 
                 {/* Clear button */}
-                {(resume || jobDescription || question || answer) && (
-                  <TouchableOpacity
-                    onPress={handleClearAll}
-                    activeOpacity={0.7}
-                    className="p-2"
-                  >
+                {(jobDescription || question || answer) && (
+                  <TouchableOpacity onPress={handleClearAll} activeOpacity={0.7} className="p-2">
                     <Text className="text-text-muted text-xs">✕</Text>
                   </TouchableOpacity>
                 )}
               </View>
             </View>
 
-            {/* Setup progress bar */}
+            {/* Setup progress bar — JD + question (2 bars) */}
             <View className="mt-4 flex-row gap-1.5">
-              <View
-                className={`h-0.5 flex-1 rounded-full ${
-                  resume.trim().length > 0 ? "bg-accent" : "bg-border"
-                }`}
-              />
               <View
                 className={`h-0.5 flex-1 rounded-full ${
                   jobDescription.trim().length > 0 ? "bg-accent" : "bg-border"
@@ -176,20 +163,16 @@ export default function InterviewScreen() {
           {/* Divider */}
           <View className="h-px bg-border mx-5 mb-6" />
 
-          {/* Context Setup */}
+          {/* Context Setup — JD only */}
           <View className="px-5">
             <Text
               style={{ fontFamily: "SpaceMono" }}
               className="text-text-muted text-xs uppercase tracking-widest mb-4"
             >
-              01 · Context Setup
+              01 · Job Description
             </Text>
 
-            <ResumeInput value={resume} onChange={setResume} />
-            <JobDescriptionInput
-              value={jobDescription}
-              onChange={setJobDescription}
-            />
+            <JobDescriptionInput value={jobDescription} onChange={setJobDescription} />
           </View>
 
           {/* Divider */}
@@ -210,9 +193,10 @@ export default function InterviewScreen() {
               onSubmit={handleAsk}
               isStreaming={isStreaming}
               canSubmit={canSubmit}
+              jobDescriptionFilled={setupComplete}
             />
 
-            {/* New Question button (after answer) */}
+            {/* New Question button */}
             {answer && !isStreaming && (
               <TouchableOpacity
                 onPress={handleReset}
@@ -234,6 +218,7 @@ export default function InterviewScreen() {
               isStreaming={isStreaming}
               error={error}
               status={status}
+              contextInfo={contextInfo}
             />
           </View>
 
@@ -242,9 +227,8 @@ export default function InterviewScreen() {
             <View className="px-5 mt-4">
               <View className="bg-surface rounded-xl p-4 border border-border">
                 <Text className="text-text-muted text-xs leading-relaxed text-center">
-                  Paste your resume and job description above, then ask any
-                  interview question. The AI will answer as you — naturally,
-                  conversationally, in real-time.
+                  Paste the job description, then speak or type your interview question.
+                  {"\n\n"}Your resumes are pre-indexed — no need to paste them each time.
                 </Text>
               </View>
             </View>

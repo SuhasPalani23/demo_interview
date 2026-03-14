@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
+import { MicButton } from "./MicButton";
+import { useAudioRecorder } from "../hooks/useAudioRecorder";
 
 interface QuestionInputProps {
   value: string;
@@ -13,6 +15,7 @@ interface QuestionInputProps {
   onSubmit: () => void;
   isStreaming: boolean;
   canSubmit: boolean;
+  jobDescriptionFilled: boolean;
 }
 
 export function QuestionInput({
@@ -21,8 +24,22 @@ export function QuestionInput({
   onSubmit,
   isStreaming,
   canSubmit,
+  jobDescriptionFilled,
 }: QuestionInputProps) {
   const [isFocused, setIsFocused] = useState(false);
+  const { state: micState, error: micError, startRecording, stopAndTranscribe, cancelRecording } = useAudioRecorder();
+
+  const handleStopAndTranscribe = async () => {
+    const text = await stopAndTranscribe();
+    if (text) {
+      onChange(text);
+      // Auto-submit after transcription — jobDescription is already filled if canSubmit was close
+      // We check it directly: if JD exists + we just got a question, fire immediately
+      if (jobDescriptionFilled && !isStreaming) {
+        setTimeout(() => onSubmit(), 80);
+      }
+    }
+  };
 
   const handleSubmit = () => {
     if (canSubmit && !isStreaming) {
@@ -43,7 +60,18 @@ export function QuestionInput({
         </Text>
       </View>
 
-      {/* Input + Button row */}
+      {/* Mic section */}
+      <View className="mb-3 bg-surface rounded-xl border border-border p-4">
+        <MicButton
+          state={micState}
+          onStart={startRecording}
+          onStop={handleStopAndTranscribe}
+          onCancel={cancelRecording}
+          error={micError}
+        />
+      </View>
+
+      {/* Text input */}
       <View
         className={`rounded-xl border overflow-hidden ${
           isFocused ? "border-border-focus" : "border-border"
@@ -56,7 +84,7 @@ export function QuestionInput({
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           onSubmitEditing={handleSubmit}
-          placeholder='e.g. "Tell me about yourself" or "How do you handle system design?"'
+          placeholder='e.g. "Tell me about yourself" or type after speaking...'
           placeholderTextColor="#4a4642"
           multiline
           numberOfLines={3}
@@ -72,7 +100,7 @@ export function QuestionInput({
           <Text className="text-text-muted text-xs">
             {value.trim().length > 0
               ? `${value.trim().length} chars`
-              : "Type your question"}
+              : "Speak or type your question"}
           </Text>
 
           <TouchableOpacity
@@ -112,7 +140,7 @@ export function QuestionInput({
       {/* Validation hints */}
       {!canSubmit && value.trim().length > 0 && (
         <Text className="text-danger text-xs mt-2 ml-1">
-          Please add your resume and job description first
+          Please add the job description first
         </Text>
       )}
     </View>

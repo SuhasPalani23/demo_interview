@@ -4,3 +4,5 @@
 
 export const WS_URL =
   process.env.EXPO_PUBLIC_BACKEND_WS_URL || "ws://localhost:4000/interview";
+export const API_BASE =
+  process.env.EXPO_PUBLIC_BACKEND_API_URL || "http://localhost:4000";
