@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Interview Assistant",
+    "slug": "interview-assistant",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "assetBundlePatterns": ["**/*"],
+    "scheme": "interview-assistant",
+    "plugins": ["expo-router"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.interviewassistant.app"
+    },
+    "android": {
+      "package": "com.interviewassistant.app"
+    }
+  }
+}
